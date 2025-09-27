@@ -36,21 +36,21 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
         $output["head"]["code"] = 400;
         $output["head"]["msg"] = "Area ID is required to generate customer_no";
     }
-}else if (isset($obj->search_text)) {
+} else if (isset($obj->search_text)) {
     $search_text = $obj->search_text;
-    
+
     $sql = "SELECT * FROM `area` WHERE `deleted_at` = 0";
     $result = $conn->query($sql);
     $output["body"]["area"] = $result->num_rows > 0 ? $result->fetch_all(MYSQLI_ASSOC) : [];
-    
+
     $sql = "SELECT * FROM `plan` WHERE `deleted_at` = 0";
     $result = $conn->query($sql);
     $output["body"]["plan"] = $result->num_rows > 0 ? $result->fetch_all(MYSQLI_ASSOC) : [];
-    
+
     $sql = "SELECT * FROM `staff` WHERE `delete_at` = 0";
     $result = $conn->query($sql);
     $output["body"]["staff"] = $result->num_rows > 0 ? $result->fetch_all(MYSQLI_ASSOC) : [];
-    
+
     $sql = "SELECT * FROM `customer` WHERE `deleted_at`= 0 AND `name` LIKE ? ORDER BY customer_no ASC";
     $stmt = $conn->prepare($sql);
     $search_param = "%$search_text%";
@@ -61,7 +61,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
     $output["head"]["code"] = 200;
     $output["head"]["msg"] = $result->num_rows > 0 ? "Success" : "Customer Details Not Found";
     $stmt->close();
-}else if (isset($obj->name) && isset($obj->phone) && isset($obj->address) && isset($obj->area_id) && isset($obj->box_no) && isset($obj->plan_id) && isset($obj->plan_prize) && isset($obj->staff_id) && isset($obj->customer_no) && isset($obj->current_user_id)) {
+} else if (isset($obj->name) && isset($obj->phone) && isset($obj->address) && isset($obj->area_id) && isset($obj->box_no) && isset($obj->plan_id) && isset($obj->plan_prize) && isset($obj->staff_id) && isset($obj->customer_no) && isset($obj->current_user_id)) {
     $name = $obj->name;
     $phone_number = $obj->phone;
     $address = $obj->address;
@@ -97,7 +97,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
         }
         $stmt->close();
     }
-    
+
     // Fetch plan_name and plan_prize
     if (!empty($plan_id)) {
         $sql = "SELECT `plan_name`, `plan_prize` FROM `plan` WHERE `plan_id`=? AND `deleted_at` = 0";
@@ -118,7 +118,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
         }
         $stmt->close();
     }
-    
+
     // Fetch staff_name
     if (!empty($staff_id)) {
         $sql = "SELECT `staff_name` FROM `staff` WHERE `staff_id`=? AND `delete_at` = 0";
@@ -140,7 +140,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
     }
 
     if (!empty($name) && !empty($box_no) && !empty($area_id) && !empty($plan_id)  && !empty($staff_id) && !empty($customer_no) && !empty($current_user_id)) {
-        
+
         // ✅ phone optional check
         if (!empty($phone_number)) {
             if (!(is_numeric($phone_number) && strlen($phone_number) == 10)) {
@@ -164,7 +164,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                     $result = $stmt->get_result();
                     $old_customer = $result->num_rows > 0 ? $result->fetch_assoc() : null;
                     $stmt->close();
-                
+
                     // Check if customer_no exists (excluding the current customer)
                     $sql = "SELECT `id` FROM `customer` WHERE `customer_no`=? AND `customer_id` != ? AND `deleted_at`=0";
                     $stmt = $conn->prepare($sql);
@@ -182,7 +182,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                         }
                     }
                     $stmt->close();
-                
+
                     // Check if plan_id has changed
                     if ($old_customer && $old_customer['plan_id'] != $plan_id) {
                         // Check if total_pending_amount and total_pending_months are 0
@@ -192,14 +192,14 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                             echo json_encode($output, JSON_NUMERIC_CHECK);
                             exit();
                         }
-                
+
                         // Update end_date and updated_at for the previous plan in plan_history
                         $sql_plan_history = "UPDATE `plan_history` SET `end_date`=?, `updated_at`=? WHERE `customer_id`=? AND `end_date` IS NULL";
                         $stmt_plan_history = $conn->prepare($sql_plan_history);
                         $stmt_plan_history->bind_param("sss", $timestamp, $timestamp, $edit_id);
                         $stmt_plan_history->execute();
                         $stmt_plan_history->close();
-                
+
                         // Insert new plan into plan_history
                         $start_date = date('Y-m-d'); // Current date as start_date
                         $sql_plan_history = "INSERT INTO `plan_history` (`customer_id`, `plan_id`, `plan_name`, `plan_prize`, `start_date`, `created_at`) 
@@ -209,7 +209,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                         $stmt_plan_history->execute();
                         $stmt_plan_history->close();
                     }
-                
+
                     // Proceed with update
                     $sql = "UPDATE `customer` SET `name`=?, `phone`=?, `address`=?, `area_id`=?, `area_name`=?, `box_no`=?, `plan_id`=?, `plan_name`=?, `plan_prize`=?, `staff_id`=?, `staff_name`=?, `customer_no`=? WHERE `customer_id`=?";
                     $stmt = $conn->prepare($sql);
@@ -217,10 +217,19 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                     if ($stmt->execute()) {
                         // Log history
                         $new_customer = [
-                            'customer_id' => $edit_id, 'name' => $name, 'phone' => $phone_number, 'address' => $address,
-                            'area_id' => $area_id, 'area_name' => $area_name, 'box_no' => $box_no, 'plan_id' => $plan_id,
-                            'plan_name' => $plan_name, 'plan_prize' => $plan_prize, 'staff_id' => $staff_id,
-                            'staff_name' => $staff_name, 'customer_no' => $customer_no
+                            'customer_id' => $edit_id,
+                            'name' => $name,
+                            'phone' => $phone_number,
+                            'address' => $address,
+                            'area_id' => $area_id,
+                            'area_name' => $area_name,
+                            'box_no' => $box_no,
+                            'plan_id' => $plan_id,
+                            'plan_name' => $plan_name,
+                            'plan_prize' => $plan_prize,
+                            'staff_id' => $staff_id,
+                            'staff_name' => $staff_name,
+                            'customer_no' => $customer_no
                         ];
                         logCustomerHistory($edit_id, $customer_no, 'customer_update', $old_customer, $new_customer, "Customer updated by $current_user_name");
                         $output["head"]["code"] = 200;
@@ -279,7 +288,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                         $stmt_update->bind_param("si", $enIduser, $cus_id);
                         $stmt_update->execute();
                         $stmt_update->close();
-                    
+
                         // Insert into plan_history
                         $start_date = date('Y-m-d'); // Current date as start_date
                         $sql_plan_history = "INSERT INTO `plan_history` (`customer_id`, `plan_id`, `plan_name`, `plan_prize`, `start_date`, `created_at`) 
@@ -288,7 +297,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                         $stmt_plan_history->bind_param("ssssss", $enIduser, $plan_id, $plan_name, $plan_prize, $start_date, $timestamp);
                         $stmt_plan_history->execute();
                         $stmt_plan_history->close();
-                    
+
                         // Log history
                         $new_customer = [
                             'customer_id' => $enIduser,
@@ -328,32 +337,48 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
         $output["head"]["code"] = 400;
         $output["head"]["msg"] = "Please provide all the required details.";
     }
-}else if (isset($obj->delete_customer_id) && isset($obj->current_user_id)) {
+} else if (isset($obj->delete_customer_id) && isset($obj->current_user_id)) {
     $delete_customer_id = $obj->delete_customer_id;
     $current_user_id = $obj->current_user_id;
 
     if (!empty($delete_customer_id) && !empty($current_user_id)) {
-        if ($delete_customer_id && $current_user_id) {
-            // Fetch customer data for logging
-            $sql = "SELECT * FROM `customer` WHERE `customer_id`=? AND `deleted_at`=0";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("s", $delete_customer_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $old_customer = $result->num_rows > 0 ? $result->fetch_assoc() : null;
-            $stmt->close();
+        // Fetch customer data for logging and area_id
+        $sql = "SELECT * FROM `customer` WHERE `customer_id`=? AND `deleted_at`=0";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("s", $delete_customer_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $old_customer = $result->num_rows > 0 ? $result->fetch_assoc() : null;
+        $stmt->close();
 
+        if ($old_customer) {
+            // Mark customer as deleted
             $sql = "UPDATE `customer` SET `deleted_at`=1 WHERE `customer_id`=?";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("s", $delete_customer_id);
             if ($stmt->execute() && $conn->affected_rows > 0) {
                 // Log history
-                if ($old_customer) {
-                    $current_user_name = getUserName($current_user_id);
-                    logCustomerHistory($delete_customer_id, $old_customer['customer_no'], 'customer_delete', $old_customer, null, "Customer deleted by $current_user_name");
+                $current_user_name = getUserName($current_user_id);
+                logCustomerHistory(
+                    $delete_customer_id,
+                    $old_customer['customer_no'],
+                    'customer_delete',
+                    $old_customer,
+                    null,
+                    "Customer deleted by $current_user_name"
+                );
+
+                // Rearrange customer_no for the area
+                if (!rearrangeCustomerNo($old_customer['area_id'])) {
+                    $output["head"]["code"] = 400;
+                    $output["head"]["msg"] = "Failed to rearrange customer numbers after deletion.";
+                    echo json_encode($output, JSON_NUMERIC_CHECK);
+                    $stmt->close();
+                    exit();
                 }
+
                 $output["head"]["code"] = 200;
-                $output["head"]["msg"] = "Successfully Customer Deleted!";
+                $output["head"]["msg"] = "Successfully Customer Deleted and Numbers Rearranged!";
             } else {
                 $output["head"]["code"] = 400;
                 $output["head"]["msg"] = "Failed to delete. Customer not found or already deleted.";
@@ -361,13 +386,13 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
             $stmt->close();
         } else {
             $output["head"]["code"] = 400;
-            $output["head"]["msg"] = "Invalid data.";
+            $output["head"]["msg"] = "Customer not found.";
         }
     } else {
         $output["head"]["code"] = 400;
         $output["head"]["msg"] = "Please provide all the required details.";
     }
-}else {
+} else {
     $output["head"]["code"] = 400;
     $output["head"]["msg"] = "Parameter Mismatch";
     $output["head"]["inputs"] = $obj;
@@ -375,4 +400,3 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
 
 echo json_encode($output);
 $conn->close();
-?>
