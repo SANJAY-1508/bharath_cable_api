@@ -10,14 +10,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     exit();
 }
 
-
 $json = file_get_contents('php://input');
 $obj = json_decode($json);
 $output = array();
 
 date_default_timezone_set('Asia/Calcutta');
 $timestamp = date('Y-m-d H:i:s');
-
 
 // Handle generate customer_no request
 if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
@@ -140,8 +138,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
     }
 
     if (!empty($name) && !empty($box_no) && !empty($area_id) && !empty($plan_id)  && !empty($staff_id) && !empty($customer_no) && !empty($current_user_id)) {
-
-        // ✅ phone optional check
+        // Phone optional check
         if (!empty($phone_number)) {
             if (!(is_numeric($phone_number) && strlen($phone_number) == 10)) {
                 $output["head"]["code"] = 400;
@@ -185,7 +182,6 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
 
                     // Check if plan_id has changed
                     if ($old_customer && $old_customer['plan_id'] != $plan_id) {
-                        // Check if total_pending_amount and total_pending_months are 0
                         if ($old_customer['total_pending_amount'] != 0 || $old_customer['total_pending_months'] != 0) {
                             $output["head"]["code"] = 400;
                             $output["head"]["msg"] = "Cannot update plan: Pending amount or months must be 0.";
@@ -201,13 +197,22 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                         $stmt_plan_history->close();
 
                         // Insert new plan into plan_history
-                        $start_date = date('Y-m-d'); // Current date as start_date
+                        $start_date = date('Y-m-d');
                         $sql_plan_history = "INSERT INTO `plan_history` (`customer_id`, `plan_id`, `plan_name`, `plan_prize`, `start_date`, `created_at`) 
                                              VALUES (?, ?, ?, ?, ?, ?)";
                         $stmt_plan_history = $conn->prepare($sql_plan_history);
                         $stmt_plan_history->bind_param("ssssss", $edit_id, $plan_id, $plan_name, $plan_prize, $start_date, $timestamp);
                         $stmt_plan_history->execute();
                         $stmt_plan_history->close();
+                    }
+
+                    // Update customer_no in collection table for the edited customer
+                    if ($old_customer && $old_customer['customer_no'] != $customer_no) {
+                        $sql = "UPDATE `collection` SET `customer_no`=? WHERE `customer_id`=?";
+                        $stmt = $conn->prepare($sql);
+                        $stmt->bind_param("ss", $customer_no, $edit_id);
+                        $stmt->execute();
+                        $stmt->close();
                     }
 
                     // Proceed with update
@@ -290,7 +295,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                         $stmt_update->close();
 
                         // Insert into plan_history
-                        $start_date = date('Y-m-d'); // Current date as start_date
+                        $start_date = date('Y-m-d');
                         $sql_plan_history = "INSERT INTO `plan_history` (`customer_id`, `plan_id`, `plan_name`, `plan_prize`, `start_date`, `created_at`) 
                                              VALUES (?, ?, ?, ?, ?, ?)";
                         $stmt_plan_history = $conn->prepare($sql_plan_history);
@@ -360,6 +365,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                 if ($old_customer) {
                     $current_user_name = getUserName($current_user_id);
                     logCustomerHistory($delete_customer_id, $old_customer['customer_no'], 'customer_delete', $old_customer, null, "Customer deleted by $current_user_name");
+                    // Rearrange customer_no after deletion
                     rearrangeCustomerNoAfterDeletion($old_customer['customer_no'], $old_customer['area_id']);
                 }
                 $output["head"]["code"] = 200;

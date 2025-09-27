@@ -526,8 +526,15 @@ function rearrangeCustomerNo($new_customer_no, $area_id, $exclude_customer_id = 
             $old_customer = $result->num_rows > 0 ? $result->fetch_assoc() : null;
             $stmt->close();
 
-            // Update customer_no
+            // Update customer_no in customer table
             $sql = "UPDATE `customer` SET `customer_no`=? WHERE `customer_id`=?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ss", $new_customer_no, $customer['customer_id']);
+            $stmt->execute();
+            $stmt->close();
+
+            // Update customer_no in collection table
+            $sql = "UPDATE `collection` SET `customer_no`=? WHERE `customer_id`=?";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("ss", $new_customer_no, $customer['customer_id']);
             $stmt->execute();
@@ -596,8 +603,15 @@ function rearrangeCustomerNoAfterDeletion($deleted_customer_no, $area_id)
             $old_customer = $result->num_rows > 0 ? $result->fetch_assoc() : null;
             $stmt->close();
 
-            // Update customer_no
+            // Update customer_no in customer table
             $sql = "UPDATE `customer` SET `customer_no`=? WHERE `customer_id`=?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ss", $new_customer_no, $customer['customer_id']);
+            $stmt->execute();
+            $stmt->close();
+
+            // Update customer_no in collection table
+            $sql = "UPDATE `collection` SET `customer_no`=? WHERE `customer_id`=?";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("ss", $new_customer_no, $customer['customer_id']);
             $stmt->execute();
