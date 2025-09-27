@@ -551,3 +551,72 @@ function rearrangeCustomerNo($new_customer_no, $area_id, $exclude_customer_id = 
 
     return true;
 }
+
+function rearrangeCustomerNoAfterDeletion($deleted_customer_no, $area_id)
+{
+    global $conn, $timestamp;
+
+    // Fetch area_prefix
+    $sql = "SELECT `area_prefix` FROM `area` WHERE `area_id`=? AND `deleted_at`=0";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("s", $area_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows == 0) {
+        $stmt->close();
+        return false;
+    }
+    $row = $result->fetch_assoc();
+    $prefix = strtoupper($row['area_prefix']);
+    $stmt->close();
+
+    // Fetch all customers with the same prefix, ordered by numeric part
+    $sql = "SELECT `customer_id`, `customer_no` FROM `customer` WHERE `customer_no` LIKE ? AND `deleted_at`=0 ORDER BY CAST(SUBSTRING(`customer_no`, ?) AS UNSIGNED) ASC";
+    $stmt = $conn->prepare($sql);
+    $search_prefix = "$prefix%";
+    $start_pos = strlen($prefix) + 1;
+    $stmt->bind_param("si", $search_prefix, $start_pos);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $customers = $result->num_rows > 0 ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    $stmt->close();
+
+    // Rearrange customer_no sequentially
+    foreach ($customers as $index => $customer) {
+        $new_number = $index + 1;
+        $new_customer_no = $prefix . str_pad($new_number, 3, '0', STR_PAD_LEFT);
+
+        if ($customer['customer_no'] != $new_customer_no) {
+            // Fetch old customer data for logging
+            $sql = "SELECT * FROM `customer` WHERE `customer_id`=? AND `deleted_at`=0";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("s", $customer['customer_id']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $old_customer = $result->num_rows > 0 ? $result->fetch_assoc() : null;
+            $stmt->close();
+
+            // Update customer_no
+            $sql = "UPDATE `customer` SET `customer_no`=? WHERE `customer_id`=?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ss", $new_customer_no, $customer['customer_id']);
+            $stmt->execute();
+            $stmt->close();
+
+            // Log the change
+            if ($old_customer) {
+                $new_customer_data = $old_customer;
+                $new_customer_data['customer_no'] = $new_customer_no;
+                logCustomerHistory(
+                    $customer['customer_id'],
+                    $new_customer_no,
+                    'customer_no_rearrange',
+                    ['customer_no' => $customer['customer_no']],
+                    ['customer_no' => $new_customer_no],
+                    "Customer number rearranged after deletion of $deleted_customer_no"
+                );
+            }
+        }
+    }
+    return true;
+}

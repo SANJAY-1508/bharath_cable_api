@@ -360,6 +360,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                 if ($old_customer) {
                     $current_user_name = getUserName($current_user_id);
                     logCustomerHistory($delete_customer_id, $old_customer['customer_no'], 'customer_delete', $old_customer, null, "Customer deleted by $current_user_name");
+                    rearrangeCustomerNoAfterDeletion($old_customer['customer_no'], $old_customer['area_id']);
                 }
                 $output["head"]["code"] = 200;
                 $output["head"]["msg"] = "Successfully Customer Deleted!";
