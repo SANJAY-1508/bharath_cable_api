@@ -342,43 +342,27 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
     $current_user_id = $obj->current_user_id;
 
     if (!empty($delete_customer_id) && !empty($current_user_id)) {
-        // Fetch customer data for logging and area_id
-        $sql = "SELECT * FROM `customer` WHERE `customer_id`=? AND `deleted_at`=0";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("s", $delete_customer_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $old_customer = $result->num_rows > 0 ? $result->fetch_assoc() : null;
-        $stmt->close();
+        if ($delete_customer_id && $current_user_id) {
+            // Fetch customer data for logging
+            $sql = "SELECT * FROM `customer` WHERE `customer_id`=? AND `deleted_at`=0";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("s", $delete_customer_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $old_customer = $result->num_rows > 0 ? $result->fetch_assoc() : null;
+            $stmt->close();
 
-        if ($old_customer) {
-            // Mark customer as deleted
             $sql = "UPDATE `customer` SET `deleted_at`=1 WHERE `customer_id`=?";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("s", $delete_customer_id);
             if ($stmt->execute() && $conn->affected_rows > 0) {
                 // Log history
-                $current_user_name = getUserName($current_user_id);
-                logCustomerHistory(
-                    $delete_customer_id,
-                    $old_customer['customer_no'],
-                    'customer_delete',
-                    $old_customer,
-                    null,
-                    "Customer deleted by $current_user_name"
-                );
-
-                // Rearrange customer_no for the area
-                if (!rearrangeCustomerNo($old_customer['area_id'])) {
-                    $output["head"]["code"] = 400;
-                    $output["head"]["msg"] = "Failed to rearrange customer numbers after deletion.";
-                    echo json_encode($output, JSON_NUMERIC_CHECK);
-                    $stmt->close();
-                    exit();
+                if ($old_customer) {
+                    $current_user_name = getUserName($current_user_id);
+                    logCustomerHistory($delete_customer_id, $old_customer['customer_no'], 'customer_delete', $old_customer, null, "Customer deleted by $current_user_name");
                 }
-
                 $output["head"]["code"] = 200;
-                $output["head"]["msg"] = "Successfully Customer Deleted and Numbers Rearranged!";
+                $output["head"]["msg"] = "Successfully Customer Deleted!";
             } else {
                 $output["head"]["code"] = 400;
                 $output["head"]["msg"] = "Failed to delete. Customer not found or already deleted.";
@@ -386,7 +370,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
             $stmt->close();
         } else {
             $output["head"]["code"] = 400;
-            $output["head"]["msg"] = "Customer not found.";
+            $output["head"]["msg"] = "Invalid data.";
         }
     } else {
         $output["head"]["code"] = 400;

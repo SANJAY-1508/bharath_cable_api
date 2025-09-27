@@ -454,7 +454,7 @@ function logCustomerHistory($customer_id, $customer_no, $action_type, $old_value
 
 
 // Function to rearrange customer_no values
-function rearrangeCustomerNo($area_id, $new_customer_no = null, $exclude_customer_id = null)
+function rearrangeCustomerNo($new_customer_no, $area_id, $exclude_customer_id = null)
 {
     global $conn, $timestamp;
 
@@ -472,7 +472,7 @@ function rearrangeCustomerNo($area_id, $new_customer_no = null, $exclude_custome
     $prefix = strtoupper($row['area_prefix']);
     $stmt->close();
 
-    // Fetch all active customers in the area, ordered by numeric part of customer_no
+    // Fetch all customers with the same prefix, ordered by numeric part
     $sql = "SELECT `customer_id`, `customer_no` FROM `customer` WHERE `customer_no` LIKE ? AND `deleted_at`=0";
     if ($exclude_customer_id) {
         $sql .= " AND `customer_id` != ?";
@@ -491,73 +491,31 @@ function rearrangeCustomerNo($area_id, $new_customer_no = null, $exclude_custome
     $customers = $result->num_rows > 0 ? $result->fetch_all(MYSQLI_ASSOC) : [];
     $stmt->close();
 
-    // If new_customer_no is provided (for create/update), check for conflict
-    if ($new_customer_no) {
-        $new_number = (int)substr($new_customer_no, strlen($prefix));
-        if ($new_number <= 0) {
-            return false; // Invalid customer_no format
+    // Extract the numeric part of the new customer_no
+    $new_number = (int)substr($new_customer_no, strlen($prefix));
+    if ($new_number <= 0) {
+        return false; // Invalid customer_no format
+    }
+
+    // Find if the new_customer_no already exists and collect affected customers
+    $affected_customers = [];
+    $conflict_found = false;
+    foreach ($customers as $customer) {
+        $current_number = (int)substr($customer['customer_no'], strlen($prefix));
+        if ($customer['customer_no'] == $new_customer_no) {
+            $conflict_found = true;
         }
-
-        $conflict_found = false;
-        $affected_customers = [];
-        foreach ($customers as $customer) {
-            $current_number = (int)substr($customer['customer_no'], strlen($prefix));
-            if ($customer['customer_no'] == $new_customer_no) {
-                $conflict_found = true;
-            }
-            if ($conflict_found && $current_number >= $new_number) {
-                $affected_customers[] = $customer;
-            }
+        if ($conflict_found && $current_number >= $new_number) {
+            $affected_customers[] = $customer;
         }
+    }
 
-        // Shift customer_no if conflict exists
-        if ($conflict_found) {
-            foreach ($affected_customers as $index => $customer) {
-                $old_customer_no = $customer['customer_no'];
-                $new_numeric_part = $new_number + $index + 1;
-                $new_customer_no_shifted = $prefix . str_pad($new_numeric_part, 3, '0', STR_PAD_LEFT);
-
-                // Fetch old customer data for logging
-                $sql = "SELECT * FROM `customer` WHERE `customer_id`=? AND `deleted_at`=0";
-                $stmt = $conn->prepare($sql);
-                $stmt->bind_param("s", $customer['customer_id']);
-                $stmt->execute();
-                $result = $stmt->get_result();
-                $old_customer = $result->num_rows > 0 ? $result->fetch_assoc() : null;
-                $stmt->close();
-
-                // Update customer_no
-                $sql = "UPDATE `customer` SET `customer_no`=? WHERE `customer_id`=?";
-                $stmt = $conn->prepare($sql);
-                $stmt->bind_param("ss", $new_customer_no_shifted, $customer['customer_id']);
-                $stmt->execute();
-                $stmt->close();
-
-                // Log the change
-                if ($old_customer) {
-                    $new_customer_data = $old_customer;
-                    $new_customer_data['customer_no'] = $new_customer_no_shifted;
-                    logCustomerHistory(
-                        $customer['customer_id'],
-                        $new_customer_no_shifted,
-                        'customer_no_rearrange',
-                        ['customer_no' => $old_customer['customer_no']],
-                        ['customer_no' => $new_customer_no_shifted],
-                        "Customer number rearranged due to conflict with $new_customer_no"
-                    );
-                }
-            }
-        }
-    } else {
-        // No new_customer_no provided (for delete), resequence all customers
-        foreach ($customers as $index => $customer) {
-            $new_numeric_part = $index + 1;
+    // If there's a conflict, shift the customer_no values
+    if ($conflict_found) {
+        foreach ($affected_customers as $index => $customer) {
+            $old_customer_no = $customer['customer_no'];
+            $new_numeric_part = $new_number + $index + 1;
             $new_customer_no = $prefix . str_pad($new_numeric_part, 3, '0', STR_PAD_LEFT);
-
-            // Skip if customer_no is already correct
-            if ($customer['customer_no'] === $new_customer_no) {
-                continue;
-            }
 
             // Fetch old customer data for logging
             $sql = "SELECT * FROM `customer` WHERE `customer_id`=? AND `deleted_at`=0";
@@ -575,7 +533,7 @@ function rearrangeCustomerNo($area_id, $new_customer_no = null, $exclude_custome
             $stmt->execute();
             $stmt->close();
 
-            // Log the change
+            // Log the change in customer_history
             if ($old_customer) {
                 $new_customer_data = $old_customer;
                 $new_customer_data['customer_no'] = $new_customer_no;
@@ -583,9 +541,9 @@ function rearrangeCustomerNo($area_id, $new_customer_no = null, $exclude_custome
                     $customer['customer_id'],
                     $new_customer_no,
                     'customer_no_rearrange',
-                    ['customer_no' => $old_customer['customer_no']],
+                    ['customer_no' => $old_customer_no],
                     ['customer_no' => $new_customer_no],
-                    "Customer number rearranged after deletion in area $area_id"
+                    "Customer number rearranged due to conflict with $new_customer_no"
                 );
             }
         }
