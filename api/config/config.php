@@ -1,7 +1,7 @@
 <?php
 $name = "localhost";
-$username = "root";
-$password = "";
+$username = "zen_cable";
+$password = "S7yhCcrDh27GhxJ8";
 $database = "cable";
 
 $conn = new mysqli($name, $username, $password, $database);
@@ -633,4 +633,66 @@ function rearrangeCustomerNoAfterDeletion($deleted_customer_no, $area_id)
         }
     }
     return true;
+}
+
+// Function to update or create monthly box history for a given year-month
+function updateMonthlyBoxHistory($conn, $year, $month, $first_day, $use_day)
+{
+    $stmt = $conn->prepare("SELECT `id` FROM `monthly_box_history` WHERE `year` = ? AND `month` = ?");
+    $stmt->bind_param("ii", $year, $month);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $timestamp = date('Y-m-d H:i:s');
+
+    if ($result->num_rows == 0) {
+        $total_boxes = 0;
+        $active_boxes = 0;
+        $disconnect_boxes = 0;
+        $total_collection = 0.0;
+    } else {
+        $row = $result->fetch_assoc();
+        $id = $row['id'];
+    }
+
+    $stmt_total = $conn->prepare("SELECT COUNT(*) AS count FROM `customer` WHERE `deleted_at` = 0 AND `create_at` <= ?");
+    $stmt_total->bind_param("s", $use_day);
+    $stmt_total->execute();
+    $total_boxes = $stmt_total->get_result()->fetch_assoc()['count'];
+    $stmt_total->close();
+
+    $stmt_active = $conn->prepare("SELECT COUNT(DISTINCT `customer_id`) AS count FROM `plan_history` 
+                                   WHERE `start_date` <= ? AND (`end_date` IS NULL OR `end_date` >= ?) AND `plan_name` != 'disconnect'");
+    $stmt_active->bind_param("ss", $use_day, $use_day);
+    $stmt_active->execute();
+    $active_boxes = $stmt_active->get_result()->fetch_assoc()['count'];
+    $stmt_active->close();
+
+    $disconnect_boxes = $total_boxes - $active_boxes;
+
+    $stmt_coll = $conn->prepare("SELECT SUM(`entry_amount`) AS sum FROM `collection` WHERE `deleted_at` = 0 AND `collection_paid_date` BETWEEN ? AND ?");
+    $stmt_coll->bind_param("ss", $first_day, $use_day);
+    $stmt_coll->execute();
+    $total_collection = $stmt_coll->get_result()->fetch_assoc()['sum'] ?: 0.0;
+    $stmt_coll->close();
+
+    if ($result->num_rows == 0) {
+        $stmt_insert = $conn->prepare("INSERT INTO `monthly_box_history` (`year`, `month`, `total_boxes`, `active_boxes`, `disconnect_boxes`, `total_collection`, `created_at`, `updated_at`) 
+                                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt_insert->bind_param("iiiiddss", $year, $month, $total_boxes, $active_boxes, $disconnect_boxes, $total_collection, $timestamp, $timestamp);
+        $stmt_insert->execute();
+        $id = $conn->insert_id;
+        $stmt_insert->close();
+
+        $enId = uniqueID('MonthlyBoxHistory', $id);
+        $stmt_update_id = $conn->prepare("UPDATE `monthly_box_history` SET `monthly_box_history_id` = ? WHERE `id` = ?");
+        $stmt_update_id->bind_param("si", $enId, $id);
+        $stmt_update_id->execute();
+        $stmt_update_id->close();
+    } else {
+        $stmt_update = $conn->prepare("UPDATE `monthly_box_history` SET `total_boxes` = ?, `active_boxes` = ?, `disconnect_boxes` = ?, `total_collection` = ?, `updated_at` = ? WHERE `id` = ?");
+        $stmt_update->bind_param("iiiddsi", $total_boxes, $active_boxes, $disconnect_boxes, $total_collection, $timestamp, $id);
+        $stmt_update->execute();
+        $stmt_update->close();
+    }
+    $stmt->close();
 }
