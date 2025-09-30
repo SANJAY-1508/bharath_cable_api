@@ -16,6 +16,10 @@ $output = array();
 
 date_default_timezone_set('Asia/Calcutta');
 $timestamp = date('Y-m-d H:i:s');
+$current_year = date('Y');
+$current_month = date('m');
+$first_day = date('Y-m-01');
+$current_date = date('Y-m-d');
 
 // Handle generate customer_no request
 if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
@@ -237,6 +241,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                             'customer_no' => $customer_no
                         ];
                         logCustomerHistory($edit_id, $customer_no, 'customer_update', $old_customer, $new_customer, "Customer updated by $current_user_name");
+                        updateMonthlyBoxHistory($conn, $current_year, $current_month, $first_day, $current_date);
                         $output["head"]["code"] = 200;
                         $output["head"]["msg"] = "Successfully Customer Details Updated";
                     } else {
@@ -321,6 +326,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                             'created_by_id' => $current_user_id
                         ];
                         logCustomerHistory($enIduser, $customer_no, 'customer_create', null, $new_customer, "Customer created by $current_user_name");
+                        updateMonthlyBoxHistory($conn, $current_year, $current_month, $first_day, $current_date);
                         $output["head"]["code"] = 200;
                         $output["head"]["msg"] = "Successfully Customer Created";
                     } else {
@@ -368,6 +374,7 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                     // Rearrange customer_no after deletion
                     rearrangeCustomerNoAfterDeletion($old_customer['customer_no'], $old_customer['area_id']);
                 }
+                updateMonthlyBoxHistory($conn, $current_year, $current_month, $first_day, $current_date);
                 $output["head"]["code"] = 200;
                 $output["head"]["msg"] = "Successfully Customer Deleted!";
             } else {
