@@ -876,7 +876,6 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $month_str = sprintf("%02d", $m);
         $month_start = $year . '-' . $month_str . '-01';
         $month_end = date('Y-m-t', strtotime($month_start)); // Last day of month
-        $month_end_with_time = $month_end . ' 23:59:59';
 
         // Restrict future months
         if ($year > $current_year || ($year == $current_year && $m > $current_month)) {
@@ -898,7 +897,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
             WHERE deleted_at = 0 AND create_at <= ?
         ";
         $stmt_total = $conn->prepare($sql_total_boxes);
-        $stmt_total->bind_param("s", $month_end_with_time);
+        $stmt_total->bind_param("s", $month_end);
         $stmt_total->execute();
         $result_total = $stmt_total->get_result();
         $total_boxes = (int)$result_total->fetch_assoc()['total_boxes'];
@@ -915,7 +914,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
             AND (ph.end_date IS NULL OR ph.end_date >= ?)
         ";
         $stmt_active = $conn->prepare($sql_active);
-        $stmt_active->bind_param("ss", $month_end_with_time, $month_start);
+        $stmt_active->bind_param("ss", $month_end, $month_start);
         $stmt_active->execute();
         $result_active = $stmt_active->get_result();
         $active_boxes = (int)$result_active->fetch_assoc()['active_boxes'];
@@ -932,7 +931,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
             AND (ph.end_date IS NULL OR ph.end_date >= ?)
         ";
         $stmt_disconnect = $conn->prepare($sql_disconnect);
-        $stmt_disconnect->bind_param("ss", $month_end_with_time, $month_start);
+        $stmt_disconnect->bind_param("ss", $month_end, $month_start);
         $stmt_disconnect->execute();
         $result_disconnect = $stmt_disconnect->get_result();
         $disconnected_boxes = (int)$result_disconnect->fetch_assoc()['disconnected_boxes'];
@@ -947,7 +946,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
             AND collection_paid_date <= ?
         ";
         $stmt_collection = $conn->prepare($sql_collection);
-        $stmt_collection->bind_param("ss", $month_start, $month_end_with_time);
+        $stmt_collection->bind_param("ss", $month_start, $month_end);
         $stmt_collection->execute();
         $result_collection = $stmt_collection->get_result();
         $total_collection = (float)$result_collection->fetch_assoc()['total_collection'];
