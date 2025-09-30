@@ -851,6 +851,123 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["msg"] = $result->num_rows > 0 ? "Success" : "No customers found for this staff";
         $stmt->close();
     }
+}else if (isset($obj->action) && $obj->action === 'monthly_report' && isset($obj->year)) {
+    $year = (int)$obj->year;
+    $month = isset($obj->month) ? (int)$obj->month : null;
+
+    if ($month !== null && ($month < 1 || $month > 12)) {
+        $output["head"]["code"] = 400;
+        $output["head"]["msg"] = "Invalid month (must be 1-12)";
+        echo json_encode($output, JSON_NUMERIC_CHECK);
+        exit();
+    }
+
+    // Get current date for restricting future months
+    $current_date = date('Y-m-d'); // e.g., 2025-09-29
+    $current_year = (int)date('Y'); // 2025
+    $current_month = (int)date('m'); // 9
+
+    // Initialize report array
+    $report = [];
+
+    $months_to_process = $month !== null ? [$month] : range(1, 12);
+
+    foreach ($months_to_process as $m) {
+        $month_str = sprintf("%02d", $m);
+        $month_start = $year . '-' . $month_str . '-01';
+        $month_end = date('Y-m-t', strtotime($month_start)); // Last day of month
+
+        // Restrict future months
+        if ($year > $current_year || ($year == $current_year && $m > $current_month)) {
+            $report[] = [
+                'year' => $year,
+                'month' => $m,
+                'total_boxes' => 0,
+                'active_boxes' => 0,
+                'disconnected_boxes' => 0,
+                'total_collection' => 0
+            ];
+            continue; // Skip calculations for future months
+        }
+
+        // Total boxes: Customers created before or on month end, not deleted
+        $sql_total_boxes = "
+            SELECT COUNT(DISTINCT customer_id) AS total_boxes
+            FROM `customer`
+            WHERE deleted_at = 0 AND create_at <= ?
+        ";
+        $stmt_total = $conn->prepare($sql_total_boxes);
+        $stmt_total->bind_param("s", $month_end);
+        $stmt_total->execute();
+        $result_total = $stmt_total->get_result();
+        $total_boxes = (int)$result_total->fetch_assoc()['total_boxes'];
+        $stmt_total->close();
+
+        // Active boxes: Customers with plan_name != 'disconnect' during the month
+        $sql_active = "
+            SELECT COUNT(DISTINCT ph.customer_id) AS active_boxes
+            FROM `plan_history` ph
+            LEFT JOIN `customer` c ON ph.customer_id = c.customer_id
+            WHERE c.deleted_at = 0
+            AND ph.plan_name != 'disconnect'
+            AND ph.start_date <= ?
+            AND (ph.end_date IS NULL OR ph.end_date >= ?)
+        ";
+        $stmt_active = $conn->prepare($sql_active);
+        $stmt_active->bind_param("ss", $month_end, $month_start);
+        $stmt_active->execute();
+        $result_active = $stmt_active->get_result();
+        $active_boxes = (int)$result_active->fetch_assoc()['active_boxes'];
+        $stmt_active->close();
+
+        // Disconnected boxes: Customers with plan_name = 'disconnect' during the month
+        $sql_disconnect = "
+            SELECT COUNT(DISTINCT ph.customer_id) AS disconnected_boxes
+            FROM `plan_history` ph
+            LEFT JOIN `customer` c ON ph.customer_id = c.customer_id
+            WHERE c.deleted_at = 0
+            AND ph.plan_name = 'disconnect'
+            AND ph.start_date <= ?
+            AND (ph.end_date IS NULL OR ph.end_date >= ?)
+        ";
+        $stmt_disconnect = $conn->prepare($sql_disconnect);
+        $stmt_disconnect->bind_param("ss", $month_end, $month_start);
+        $stmt_disconnect->execute();
+        $result_disconnect = $stmt_disconnect->get_result();
+        $disconnected_boxes = (int)$result_disconnect->fetch_assoc()['disconnected_boxes'];
+        $stmt_disconnect->close();
+
+        // Total collection for the month
+        $sql_collection = "
+            SELECT COALESCE(SUM(entry_amount), 0) AS total_collection
+            FROM `collection`
+            WHERE deleted_at = 0
+            AND collection_paid_date >= ?
+            AND collection_paid_date <= ?
+        ";
+        $stmt_collection = $conn->prepare($sql_collection);
+        $stmt_collection->bind_param("ss", $month_start, $month_end);
+        $stmt_collection->execute();
+        $result_collection = $stmt_collection->get_result();
+        $total_collection = (float)$result_collection->fetch_assoc()['total_collection'];
+        $stmt_collection->close();
+
+        $report[] = [
+            'year' => $year,
+            'month' => $m,
+            'total_boxes' => $total_boxes,
+            'active_boxes' => $active_boxes,
+            'disconnected_boxes' => $disconnected_boxes,
+            'total_collection' => $total_collection
+        ];
+    }
+
+    $output["head"]["code"] = 200;
+    $output["head"]["msg"] = "Success";
+    $output["body"]["report"] = $report;
+
+    echo json_encode($output, JSON_NUMERIC_CHECK);
+    exit();
 }else {
     $output["head"]["code"] = 400;
     $output["head"]["msg"] = "Parameter Mismatch";
