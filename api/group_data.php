@@ -85,9 +85,12 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["code"] = 500;
         $output["head"]["msg"] = "DB Prepare Error: ".$conn->error;
     }
-}else if (isset($obj->list_history)) {
+}
+else if (isset($obj->list_history)) {
     $customer_id = isset($obj->customer_id) ? $obj->customer_id : null;
     $customer_no = isset($obj->customer_no) ? $obj->customer_no : null;
+    $from_date = isset($obj->from_date) ? $obj->from_date : null;
+    $to_date = isset($obj->to_date) ? $obj->to_date : null;
     
     $sql = "SELECT `id`, `customer_id`, `customer_no`, `action_type`, `old_value`, `new_value`, `remarks`, `created_at` FROM `customer_history` WHERE 1";
     $params = [];
@@ -101,6 +104,17 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
     if (!empty($customer_no)) {
         $sql .= " AND `customer_no` = ?";
         $params[] = $customer_no;
+        $types .= "s";
+    }
+    if (!empty($from_date)) {
+        $sql .= " AND DATE(`created_at`) >= ?";
+        $params[] = $from_date;
+        $types .= "s";
+    }
+    // Add Date To Filter
+    if (!empty($to_date)) {
+        $sql .= " AND DATE(`created_at`) <= ?";
+        $params[] = $to_date;
         $types .= "s";
     }
     
@@ -129,7 +143,8 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
     $output["head"]["code"] = 200;
     $output["head"]["msg"] = $result->num_rows > 0 ? "Success" : "No History Found";
     $stmt->close();
-}else if (isset($obj->get_staff_grouped_data)) {
+}
+else if (isset($obj->get_staff_grouped_data)) {
     // Query to fetch staff-wise and user-wise grouped collection data
     $sql = "
         SELECT 
