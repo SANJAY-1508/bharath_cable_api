@@ -18,12 +18,12 @@ $output = array();
 
 date_default_timezone_set('Asia/Calcutta');
 $timestamp = date('Y-m-d H:i:s');
-$current_month = date('Y-m'); 
+$current_month = date('Y-m');
 $current_date = date('Y-m-d');
 
 if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staff_id)) {
-    
-    $staff_id = $obj->staff_id; 
+
+    $staff_id = $obj->staff_id;
     $search_text = isset($obj->search_text) ? $obj->search_text : "";
     $from_date = isset($obj->fromdate) ? $obj->fromdate : "";
     $to_date = isset($obj->todate) ? $obj->todate : "";
@@ -83,16 +83,16 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $stmt->close();
     } else {
         $output["head"]["code"] = 500;
-        $output["head"]["msg"] = "DB Prepare Error: ".$conn->error;
+        $output["head"]["msg"] = "DB Prepare Error: " . $conn->error;
     }
-}else if (isset($obj->list_history)) {
+} else if (isset($obj->list_history)) {
     $customer_id = isset($obj->customer_id) ? $obj->customer_id : null;
     $customer_no = isset($obj->customer_no) ? $obj->customer_no : null;
-    
+
     $sql = "SELECT `id`, `customer_id`, `customer_no`, `action_type`, `old_value`, `new_value`, `remarks`, `created_at` FROM `customer_history` WHERE 1";
     $params = [];
     $types = "";
-    
+
     if (!empty($customer_id)) {
         $sql .= " AND `customer_id` = ?";
         $params[] = $customer_id;
@@ -103,18 +103,18 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $params[] = $customer_no;
         $types .= "s";
     }
-    
+
     $sql .= " ORDER BY `created_at` DESC";
     $stmt = $conn->prepare($sql);
-    
+
     if (!empty($params)) {
         $stmt->bind_param($types, ...$params);
     }
-    
+
     $stmt->execute();
     $result = $stmt->get_result();
     $history = $result->num_rows > 0 ? $result->fetch_all(MYSQLI_ASSOC) : [];
-    
+
     foreach ($history as &$record) {
         try {
             $record['old_value'] = $record['old_value'] ? json_decode($record['old_value'], true) : null;
@@ -124,12 +124,12 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
             $record['new_value'] = null;
         }
     }
-    
+
     $output["body"]["history"] = $history;
     $output["head"]["code"] = 200;
     $output["head"]["msg"] = $result->num_rows > 0 ? "Success" : "No History Found";
     $stmt->close();
-}else if (isset($obj->get_staff_grouped_data)) {
+} else if (isset($obj->get_staff_grouped_data)) {
     // Query to fetch staff-wise and user-wise grouped collection data
     $sql = "
         SELECT 
@@ -291,7 +291,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["code"] = 400;
         $output["head"]["msg"] = "Failed to fetch staff data: " . $conn->error;
     }
-}else if (isset($obj->get_grouped_customer_data)) {
+} else if (isset($obj->get_grouped_customer_data)) {
     // Query to fetch counts for connected, disconnected, and total boxes
     $sql_counts = "
         SELECT 
@@ -367,8 +367,8 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
             "total_boxes_data" => []
         ];
     }
-}else if (isset($obj->get_staff_grouped_counts)) {
-      $sql = "
+} else if (isset($obj->get_staff_grouped_counts)) {
+    $sql = "
         SELECT 
             c.staff_id,
             c.staff_name,
@@ -548,8 +548,8 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["code"] = 400;
         $output["head"]["msg"] = "Failed to fetch data: " . $conn->error;
     }
-}else if (isset($obj->login_history)) {
-    
+} else if (isset($obj->login_history)) {
+
     $search_text = isset($obj->search_text) ? $conn->real_escape_string($obj->search_text) : '';
 
     if (!empty($search_text)) {
@@ -579,7 +579,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["msg"] = "Login History Not Found";
         $output["body"]["LoginHistory"] = [];
     }
-}else if (isset($obj->action) && $obj->action === 'dashboard' && isset($obj->staff_id)) {
+} else if (isset($obj->action) && $obj->action === 'dashboard' && isset($obj->staff_id)) {
     $current_date = date('Y-m-d');
     $current_month = date('Y-m');
 
@@ -796,8 +796,8 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["code"] = 400;
         $output["head"]["msg"] = "Failed to fetch dashboard data: " . $conn->error;
     }
-}else if (isset($obj->search_text) || isset($obj->area_name) || (isset($obj->staff_id) && isset($obj->action) && $obj->action === 'due_list')) {
-   // Check if action is due_list and staff_id is provided
+} else if (isset($obj->search_text) || isset($obj->area_name) || (isset($obj->staff_id) && isset($obj->action) && $obj->action === 'due_list')) {
+    // Check if action is due_list and staff_id is provided
     if (isset($obj->action) && $obj->action === 'due_list' && isset($obj->staff_id)) {
         // Build SQL query to fetch customer data filtered by staff_id
         $sql = "SELECT * FROM `customer` WHERE `deleted_at` = 0 AND `staff_id` = ?";
@@ -851,7 +851,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["msg"] = $result->num_rows > 0 ? "Success" : "No customers found for this staff";
         $stmt->close();
     }
-}else if (isset($obj->action) && $obj->action === 'monthly_report') {
+} else if (isset($obj->action) && $obj->action === 'monthly_report') {
     // Query all records from monthly_box_history
     $sql = "SELECT `year`, `month`, `total_boxes`, `active_boxes`, `disconnect_boxes` AS disconnected_boxes, `total_collection`
             FROM `monthly_box_history`
@@ -879,7 +879,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
 
     echo json_encode($output, JSON_NUMERIC_CHECK);
     exit();
-}else {
+} else {
     $output["head"]["code"] = 400;
     $output["head"]["msg"] = "Parameter Mismatch";
     $output["head"]["inputs"] = $obj;
@@ -887,4 +887,3 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
 
 echo json_encode($output, JSON_NUMERIC_CHECK);
 $conn->close();
-?>
