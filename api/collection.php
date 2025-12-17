@@ -17,49 +17,48 @@ date_default_timezone_set( 'Asia/Calcutta' );
 $timestamp = date( 'Y-m-d H:i:s' );
 
 if ( isset( $obj[ 'search_text' ] ) ) {
-    $search_text = $obj[ 'search_text' ];
-    $sql = 'SELECT * FROM `area` WHERE `deleted_at` = 0';
-    $result = $conn->query( $sql );
-    $output[ 'body' ][ 'area' ] = $result->num_rows > 0 ? $result->fetch_all( MYSQLI_ASSOC ) : [];
+    $search_text = $conn->real_escape_string($obj['search_text']);
+    $from_date = isset($obj['from_date']) ? $conn->real_escape_string($obj['from_date']) : '';
+    $to_date = isset($obj['to_date']) ? $conn->real_escape_string($obj['to_date']) : '';
+    $area_id = isset($obj['area_id']) ? $conn->real_escape_string($obj['area_id']) : '';
+    $staff_id = isset($obj['staff_id']) ? $conn->real_escape_string($obj['staff_id']) : '';
 
-    $sql = 'SELECT * FROM `plan` WHERE `deleted_at` = 0';
-    $result = $conn->query( $sql );
-    $output[ 'body' ][ 'plan' ] = $result->num_rows > 0 ? $result->fetch_all( MYSQLI_ASSOC ) : [];
-
-    $sql = 'SELECT * FROM `customer` WHERE `deleted_at` = 0';
-    $result = $conn->query( $sql );
-    $output[ 'body' ][ 'customer' ] = $result->num_rows > 0 ? $result->fetch_all( MYSQLI_ASSOC ) : [];
-
-    $sql = "SELECT 
-                c.`id`, c.`collection_id`, c.`collection_paid_date`, c.`customer_id`, cu.`customer_no`, 
-                cu.`name`, cu.`phone`, cu.`address`, c.`area_id`, a.`area_name`, c.`box_no`, 
-                c.`plan_id`, p.`plan_name`, p.`plan_prize`, c.`staff_id`, s.`staff_name`, 
-                c.`entry_amount`, c.`payment_method`,c.`total_pending_amount`,c.`balance_amount`, c.`paid_by`, c.`paid_by_name`, 
-                c.`create_at`, c.`deleted_at`, c.`edited_by`, c.`edited_by_name` 
+    // Start the Base Query
+    $sql = "SELECT c.*, cust.name, cust.customer_no, a.area_name, s.staff_name, p.plan_name 
             FROM `collection` c
-            LEFT JOIN `customer` cu ON c.`customer_id` = cu.`customer_id`
-            LEFT JOIN `area` a ON c.`area_id` = a.`area_id`
-            LEFT JOIN `plan` p ON c.`plan_id` = p.`plan_id`
-            LEFT JOIN `staff` s ON c.`staff_id` = s.`staff_id`
-        
-        WHERE c.`deleted_at` = 0 AND (cu.`name` LIKE ? OR cu.`customer_no` LIKE ?)";
-    $stmt = $conn->prepare( $sql );
-    if ( $stmt ) {
-        $search_param = "%$search_text%";
-     $stmt->bind_param("ss", $search_param, $search_param);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $collections = $result->num_rows > 0 ? $result->fetch_all( MYSQLI_ASSOC ) : [];
-        $output[ 'body' ][ 'collection' ] = $collections;
-        $output[ 'head' ][ 'code' ] = 200;
-        $output[ 'head' ][ 'msg' ] = $result->num_rows > 0 ? 'Success' : 'Customer Details Not Found';
-        $stmt->close();
+            LEFT JOIN `customer` cust ON c.customer_id = cust.customer_id
+            LEFT JOIN `area` a ON cust.area_id = a.area_id
+            LEFT JOIN `staff` s ON cust.staff_id = s.staff_id
+            LEFT JOIN `plan` p ON c.plan_id = p.plan_id
+            WHERE c.deleted_at = 0";
+
+    // Dynamic Filtering Logic
+    if (!empty($search_text)) {
+        $sql .= " AND (cust.name LIKE '%$search_text%' OR cust.customer_no LIKE '%$search_text%' OR c.box_no LIKE '%$search_text%')";
     }
 
-    $sql = 'SELECT * FROM `staff` WHERE `delete_at` = 0';
-    $result = $conn->query( $sql );
-    $output[ 'body' ][ 'staff' ] = $result->num_rows > 0 ? $result->fetch_all( MYSQLI_ASSOC ) : [];
-} elseif ( isset( $obj[ 'collection_paid_date' ], $obj[ 'area_id' ], $obj[ 'customer_id' ], $obj[ 'box_no' ], $obj[ 'plan_id' ], $obj[ 'current_user_id' ] ) ) {
+    if (!empty($from_date) && !empty($to_date)) {
+        $sql .= " AND c.collection_paid_date BETWEEN '$from_date' AND '$to_date'";
+    }
+
+    if (!empty($area_id)) {
+        $sql .= " AND cust.area_id = '$area_id'";
+    }
+
+    if (!empty($staff_id)) {
+        $sql .= " AND cust.staff_id = '$staff_id'";
+    }
+
+    $sql .= " ORDER BY c.collection_paid_date DESC";
+
+    $result = $conn->query($sql);
+    $output['body']['collection'] = ($result && $result->num_rows > 0) ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    
+
+    $output['head']['code'] = 200;
+    $output['head']['msg'] = 'Success';
+}
+elseif ( isset( $obj[ 'collection_paid_date' ], $obj[ 'area_id' ], $obj[ 'customer_id' ], $obj[ 'box_no' ], $obj[ 'plan_id' ], $obj[ 'current_user_id' ] ) ) {
     $collection_paid_date = $obj[ 'collection_paid_date' ];
     $area_id = $obj[ 'area_id' ];
     $customer_id = $obj[ 'customer_id' ];
