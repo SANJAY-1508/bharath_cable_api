@@ -36,7 +36,8 @@ if (isset($obj->search_text)) {
         $output["head"]["msg"] = "plan Details Not Found";
         $output["body"]["user"] = [];
     }
-}else if (isset($obj->plan_name) && isset($obj->current_user_id)) {
+}
+else if (isset($obj->plan_name) && isset($obj->current_user_id)) {
 
     $plan_name = $obj->plan_name;
     $plan_prize = $obj->plan_prize ?? 0;
