@@ -187,14 +187,14 @@ if (isset($obj['search_text'])) {
             }
 
             // 2. Same user check (for partial payments)
-            $sql_month_check = "
+             $sql_month_check = "
                 SELECT c.paid_by, u.name AS paid_by_name 
                 FROM `collection` c 
                 LEFT JOIN `user` u ON c.paid_by = u.user_id 
                 WHERE c.customer_id = ? 
                 AND DATE_FORMAT(c.collection_paid_date, '%Y-%m') = ? 
                 AND c.deleted_at = 0 
-                LIMIT 1";
+                LIMIT 1";   
             $stmt_month = $conn->prepare($sql_month_check);
             $previous_paid_by = null;
             $previous_paid_by_name = null;
@@ -209,7 +209,7 @@ if (isset($obj['search_text'])) {
                 }
                 $stmt_month->close();
             }
-
+    
             if ($previous_paid_by && $previous_paid_by !== $current_user_id) {
                 $output["head"]["code"] = 400;
                 $output["head"]["msg"] = "Balance can only be collected by the same user/staff who started the month. Previous collector: $previous_paid_by_name";
@@ -255,24 +255,12 @@ if (isset($obj['search_text'])) {
                             $stmt_customer_update->bind_param("dddddddds", $previous_entry_amount, $entry_amount, $previous_collection_months, $total_collection_months, $previous_entry_amount, $entry_amount, $previous_collection_months, $total_collection_months, $customer_id);
                             if ($stmt_customer_update->execute()) {
                                 $new_collection = [
-                                    'collection_paid_date' => $collection_paid_date,
-                                    'area_id' => $area_id,
-                                    'area_name' => $area_name,
-                                    'customer_id' => $customer_id,
-                                    'customer_no' => $customer_no,
-                                    'name' => $name,
-                                    'phone' => $phone,
-                                    'address' => $address,
-                                    'box_no' => $box_no,
-                                    'plan_id' => $plan_id,
-                                    'plan_name' => $plan_name,
-                                    'plan_prize' => $plan_prize,
-                                    'staff_id' => $staff_id,
-                                    'staff_name' => $staff_name,
-                                    'entry_amount' => $entry_amount,
-                                    'payment_method' => $payment_method,
-                                    'total_pending_amount' => $total_pending_amount,
-                                    'balance_amount' => $balance_amount,
+                                    'collection_paid_date' => $collection_paid_date, 'area_id' => $area_id, 'area_name' => $area_name,
+                                    'customer_id' => $customer_id, 'customer_no' => $customer_no, 'name' => $name, 'phone' => $phone,
+                                    'address' => $address, 'box_no' => $box_no, 'plan_id' => $plan_id, 'plan_name' => $plan_name,
+                                    'plan_prize' => $plan_prize, 'staff_id' => $staff_id, 'staff_name' => $staff_name,
+                                    'entry_amount' => $entry_amount, 'payment_method' => $payment_method,
+                                    'total_pending_amount' => $total_pending_amount, 'balance_amount' => $balance_amount,
                                     'created_by_id' => $old_collection['created_by_id']
                                 ];
                                 logCustomerHistory($customer_id, $customer_no, 'collection_update', $old_collection, $new_collection, "Collection updated by $current_user_name");
@@ -323,26 +311,13 @@ if (isset($obj['search_text'])) {
                             $stmt_customer_update->bind_param("dddds", $entry_amount, $total_collection_months, $entry_amount, $total_collection_months, $customer_id);
                             if ($stmt_customer_update->execute()) {
                                 $new_collection = [
-                                    'collection_id' => $enIdcoll,
-                                    'collection_paid_date' => $collection_paid_date,
-                                    'area_id' => $area_id,
-                                    'area_name' => $area_name,
-                                    'customer_id' => $customer_id,
-                                    'customer_no' => $customer_no,
-                                    'name' => $name,
-                                    'phone' => $phone,
-                                    'address' => $address,
-                                    'box_no' => $box_no,
-                                    'plan_id' => $plan_id,
-                                    'plan_name' => $plan_name,
-                                    'plan_prize' => $plan_prize,
-                                    'staff_id' => $staff_id,
-                                    'staff_name' => $staff_name,
-                                    'entry_amount' => $entry_amount,
-                                    'payment_method' => $payment_method,
-                                    'total_pending_amount' => $total_pending_amount,
-                                    'balance_amount' => $balance_amount,
-                                    'created_by_id' => $current_user_id
+                                    'collection_id' => $enIdcoll, 'collection_paid_date' => $collection_paid_date, 'area_id' => $area_id, 
+                                    'area_name' => $area_name, 'customer_id' => $customer_id, 'customer_no' => $customer_no, 
+                                    'name' => $name, 'phone' => $phone, 'address' => $address, 'box_no' => $box_no, 
+                                    'plan_id' => $plan_id, 'plan_name' => $plan_name, 'plan_prize' => $plan_prize, 
+                                    'staff_id' => $staff_id, 'staff_name' => $staff_name, 'entry_amount' => $entry_amount, 
+                                    'payment_method' => $payment_method, 'total_pending_amount' => $total_pending_amount,
+                                    'balance_amount' => $balance_amount, 'created_by_id' => $current_user_id
                                 ];
                                 logCustomerHistory($customer_id, $customer_no, 'collection_create', null, $new_collection, "Collection created by $current_user_name");
                                 $year = date('Y', strtotime($collection_paid_date));
@@ -389,18 +364,16 @@ if (isset($obj['search_text'])) {
                 $customer_id = $row['customer_id'];
                 $customer_no = $row['customer_no'];
                 $plan_prize = floatval($row['plan_prize']);
-                $total_pending_amount = floatval($row['total_pending_amount']);
-                $balance_amount = floatval($row['balance_amount']);
+                $total_pending_amount = floatval($row['total_pending_amount']); 
+                $balance_amount = floatval($row['balance_amount']); 
                 $collection_paid_date = $row['collection_paid_date'];
                 $months = $entry_amount / $plan_prize;
 
                 $old_collection = [
-                    'collection_id' => $delete_collection_id,
-                    'entry_amount' => $entry_amount,
-                    'customer_id' => $customer_id,
-                    'customer_no' => $customer_no,
-                    'total_pending_amount' => $total_pending_amount,
-                    'balance_amount' => $balance_amount,
+                    'collection_id' => $delete_collection_id, 'entry_amount' => $entry_amount, 
+                    'customer_id' => $customer_id, 'customer_no' => $customer_no,
+                    'total_pending_amount' => $total_pending_amount, 
+                    'balance_amount' => $balance_amount, 
                     'created_by_id' => $row['created_by_id']
                 ];
 
@@ -451,3 +424,4 @@ if (isset($obj['search_text'])) {
 
 echo json_encode($output, JSON_NUMERIC_CHECK);
 $conn->close();
+?>

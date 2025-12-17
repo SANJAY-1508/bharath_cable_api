@@ -290,49 +290,48 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)";
                     $stmt = $conn->prepare($sql);
                     $stmt->bind_param("sssssssssssssdss", $name, $phone_number, $address, $area_id, $area_name, $box_no, $plan_id, $plan_name, $plan_prize, $staff_id, $staff_name, $customer_no, $total_pending_amount, $total_pending_months, $timestamp, $current_user_id);
-                    if ($stmt->execute()) {
-                        $cus_id = $conn->insert_id;
-                        $enIduser = uniqueID('Customer', $cus_id);
-                        $sql = "UPDATE `customer` SET `customer_id`=? WHERE `id`=?";
-                        $stmt_update = $conn->prepare($sql);
-                        $stmt_update->bind_param("si", $enIduser, $cus_id);
-                        $stmt_update->execute();
-                        $stmt_update->close();
-
-                        // Insert into plan_history
-                        $start_date = date('Y-m-d');
-                        $sql_plan_history = "INSERT INTO `plan_history` (`customer_id`, `plan_id`, `plan_name`, `plan_prize`, `start_date`, `created_at`) 
-                                             VALUES (?, ?, ?, ?, ?, ?)";
-                        $stmt_plan_history = $conn->prepare($sql_plan_history);
-                        $stmt_plan_history->bind_param("ssssss", $enIduser, $plan_id, $plan_name, $plan_prize, $start_date, $timestamp);
-                        $stmt_plan_history->execute();
-                        $stmt_plan_history->close();
-
-                        // Log history
-                        $new_customer = [
-                            'customer_id' => $enIduser,
-                            'name' => $name,
-                            'phone' => $phone_number,
-                            'address' => $address,
-                            'area_id' => $area_id,
-                            'area_name' => $area_name,
-                            'box_no' => $box_no,
-                            'plan_id' => $plan_id,
-                            'plan_name' => $plan_name,
-                            'plan_prize' => $plan_prize,
-                            'staff_id' => $staff_id,
-                            'staff_name' => $staff_name,
-                            'customer_no' => $customer_no,
-                            'created_by_id' => $current_user_id
-                        ];
-                        logCustomerHistory($enIduser, $customer_no, 'customer_create', null, $new_customer, "Customer created by $current_user_name");
-                        updateMonthlyBoxHistory($conn, $current_year, $current_month, $first_day, $current_date);
-                        $output["head"]["code"] = 200;
-                        $output["head"]["msg"] = "Successfully Customer Created";
+                   // In customer creation block
+                if ($stmt->execute()) {
+                    $cus_id = $conn->insert_id;
+                    $enIduser = uniqueID('Customer', $cus_id);
+                    $sql = "UPDATE `customer` SET `customer_id`=? WHERE `id`=?";
+                    $stmt_update = $conn->prepare($sql);
+                    $stmt_update->bind_param("si", $enIduser, $cus_id);
+                    $stmt_update->execute();
+                    $stmt_update->close();
+                
+                    $start_date = date('Y-m-d');
+                    $sql_plan_history = "INSERT INTO `plan_history` (`customer_id`, `plan_id`, `plan_name`, `plan_prize`, `start_date`, `created_at`) 
+                                         VALUES (?, ?, ?, ?, ?, ?)";
+                    $stmt_plan_history = $conn->prepare($sql_plan_history);
+                    $stmt_plan_history->bind_param("ssssss", $enIduser, $plan_id, $plan_name, $plan_prize, $start_date, $timestamp);
+                    $stmt_plan_history->execute();
+                    $stmt_plan_history->close();
+                
+                    $new_customer = [
+                        'customer_id' => $enIduser,
+                        'name' => $name,
+                        'phone' => $phone_number,
+                        'address' => $address,
+                        'area_id' => $area_id,
+                        'area_name' => $area_name,
+                        'box_no' => $box_no,
+                        'plan_id' => $plan_id,
+                        'plan_name' => $plan_name,
+                        'plan_prize' => $plan_prize,
+                        'staff_id' => $staff_id,
+                        'staff_name' => $staff_name,
+                        'customer_no' => $customer_no,
+                        'created_by_id' => $current_user_id
+                    ];
+                    logCustomerHistory($enIduser, $customer_no, 'customer_create', null, $new_customer, "Customer created by $current_user_name");
+                    updateMonthlyBoxHistory($conn, $current_year, $current_month, $first_day, $current_date); // Already correct
+                    $output["head"]["code"] = 200;
+                    $output["head"]["msg"] = "Successfully Customer Created";
                     } else {
-                        $output["head"]["code"] = 400;
-                        $output["head"]["msg"] = "Failed to create customer: " . $conn->error;
-                    }
+                            $output["head"]["code"] = 400;
+                            $output["head"]["msg"] = "Failed to create customer: " . $conn->error;
+                        }
                     $stmt->close();
                 }
             } else {
@@ -398,3 +397,4 @@ if (isset($obj->generate_customer_no) && isset($obj->area_id)) {
 
 echo json_encode($output);
 $conn->close();
+?>

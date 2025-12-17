@@ -635,6 +635,8 @@ function rearrangeCustomerNoAfterDeletion($deleted_customer_no, $area_id)
     return true;
 }
 
+
+
 // Function to update or create monthly box history for a given year-month
 function updateMonthlyBoxHistory($conn, $year, $month, $first_day, $use_day)
 {
@@ -654,23 +656,41 @@ function updateMonthlyBoxHistory($conn, $year, $month, $first_day, $use_day)
         $id = $row['id'];
     }
 
+    // Adjust use_day to include the entire day (up to 23:59:59)
+    $use_day_end = date('Y-m-d 23:59:59', strtotime($use_day));
+
+    // Count total non-deleted customers up to the end of use_day
     $stmt_total = $conn->prepare("SELECT COUNT(*) AS count FROM `customer` WHERE `deleted_at` = 0 AND `create_at` <= ?");
-    $stmt_total->bind_param("s", $use_day);
+    $stmt_total->bind_param("s", $use_day_end);
     $stmt_total->execute();
     $total_boxes = $stmt_total->get_result()->fetch_assoc()['count'];
     $stmt_total->close();
 
-    $stmt_active = $conn->prepare("SELECT COUNT(DISTINCT `customer_id`) AS count FROM `plan_history` 
-                                   WHERE `start_date` <= ? AND (`end_date` IS NULL OR `end_date` >= ?) AND `plan_name` != 'disconnect'");
-    $stmt_active->bind_param("ss", $use_day, $use_day);
+    // Count active boxes (distinct customers with latest active plans)
+    $stmt_active = $conn->prepare("
+        SELECT COUNT(DISTINCT ph.customer_id) AS count 
+        FROM `plan_history` ph
+        INNER JOIN (
+            SELECT customer_id, MAX(created_at) AS latest_created_at
+            FROM `plan_history`
+            WHERE `start_date` <= ?
+            GROUP BY customer_id
+        ) latest ON ph.customer_id = latest.customer_id AND ph.created_at = latest.latest_created_at
+        WHERE ph.start_date <= ? 
+        AND (ph.end_date IS NULL OR ph.end_date >= ?) 
+        AND ph.plan_name != 'disconnect'
+    ");
+    $stmt_active->bind_param("sss", $use_day_end, $use_day_end, $use_day_end);
     $stmt_active->execute();
     $active_boxes = $stmt_active->get_result()->fetch_assoc()['count'];
     $stmt_active->close();
 
+    // Calculate disconnect boxes
     $disconnect_boxes = $total_boxes - $active_boxes;
 
+    // Sum total collection for the month
     $stmt_coll = $conn->prepare("SELECT SUM(`entry_amount`) AS sum FROM `collection` WHERE `deleted_at` = 0 AND `collection_paid_date` BETWEEN ? AND ?");
-    $stmt_coll->bind_param("ss", $first_day, $use_day);
+    $stmt_coll->bind_param("ss", $first_day, $use_day_end);
     $stmt_coll->execute();
     $total_collection = $stmt_coll->get_result()->fetch_assoc()['sum'] ?: 0.0;
     $stmt_coll->close();
@@ -690,7 +710,7 @@ function updateMonthlyBoxHistory($conn, $year, $month, $first_day, $use_day)
         $stmt_update_id->close();
     } else {
         $stmt_update = $conn->prepare("UPDATE `monthly_box_history` SET `total_boxes` = ?, `active_boxes` = ?, `disconnect_boxes` = ?, `total_collection` = ?, `updated_at` = ? WHERE `id` = ?");
-        $stmt_update->bind_param("iiiddsi", $total_boxes, $active_boxes, $disconnect_boxes, $total_collection, $timestamp, $id);
+        $stmt_update->bind_param("iiiisi", $total_boxes, $active_boxes, $disconnect_boxes, $total_collection, $timestamp, $id);
         $stmt_update->execute();
         $stmt_update->close();
     }

@@ -18,12 +18,12 @@ $output = array();
 
 date_default_timezone_set('Asia/Calcutta');
 $timestamp = date('Y-m-d H:i:s');
-$current_month = date('Y-m');
+$current_month = date('Y-m'); 
 $current_date = date('Y-m-d');
 
 if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staff_id)) {
-
-    $staff_id = $obj->staff_id;
+    
+    $staff_id = $obj->staff_id; 
     $search_text = isset($obj->search_text) ? $obj->search_text : "";
     $from_date = isset($obj->fromdate) ? $obj->fromdate : "";
     $to_date = isset($obj->todate) ? $obj->todate : "";
@@ -83,16 +83,16 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $stmt->close();
     } else {
         $output["head"]["code"] = 500;
-        $output["head"]["msg"] = "DB Prepare Error: " . $conn->error;
+        $output["head"]["msg"] = "DB Prepare Error: ".$conn->error;
     }
-} else if (isset($obj->list_history)) {
+}else if (isset($obj->list_history)) {
     $customer_id = isset($obj->customer_id) ? $obj->customer_id : null;
     $customer_no = isset($obj->customer_no) ? $obj->customer_no : null;
-
+    
     $sql = "SELECT `id`, `customer_id`, `customer_no`, `action_type`, `old_value`, `new_value`, `remarks`, `created_at` FROM `customer_history` WHERE 1";
     $params = [];
     $types = "";
-
+    
     if (!empty($customer_id)) {
         $sql .= " AND `customer_id` = ?";
         $params[] = $customer_id;
@@ -103,18 +103,18 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $params[] = $customer_no;
         $types .= "s";
     }
-
+    
     $sql .= " ORDER BY `created_at` DESC";
     $stmt = $conn->prepare($sql);
-
+    
     if (!empty($params)) {
         $stmt->bind_param($types, ...$params);
     }
-
+    
     $stmt->execute();
     $result = $stmt->get_result();
     $history = $result->num_rows > 0 ? $result->fetch_all(MYSQLI_ASSOC) : [];
-
+    
     foreach ($history as &$record) {
         try {
             $record['old_value'] = $record['old_value'] ? json_decode($record['old_value'], true) : null;
@@ -124,12 +124,12 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
             $record['new_value'] = null;
         }
     }
-
+    
     $output["body"]["history"] = $history;
     $output["head"]["code"] = 200;
     $output["head"]["msg"] = $result->num_rows > 0 ? "Success" : "No History Found";
     $stmt->close();
-} else if (isset($obj->get_staff_grouped_data)) {
+}else if (isset($obj->get_staff_grouped_data)) {
     // Query to fetch staff-wise and user-wise grouped collection data
     $sql = "
         SELECT 
@@ -291,7 +291,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["code"] = 400;
         $output["head"]["msg"] = "Failed to fetch staff data: " . $conn->error;
     }
-} else if (isset($obj->get_grouped_customer_data)) {
+}else if (isset($obj->get_grouped_customer_data)) {
     // Query to fetch counts for connected, disconnected, and total boxes
     $sql_counts = "
         SELECT 
@@ -367,8 +367,8 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
             "total_boxes_data" => []
         ];
     }
-} else if (isset($obj->get_staff_grouped_counts)) {
-    $sql = "
+}else if (isset($obj->get_staff_grouped_counts)) {
+      $sql = "
         SELECT 
             c.staff_id,
             c.staff_name,
@@ -548,8 +548,8 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["code"] = 400;
         $output["head"]["msg"] = "Failed to fetch data: " . $conn->error;
     }
-} else if (isset($obj->login_history)) {
-
+}else if (isset($obj->login_history)) {
+    
     $search_text = isset($obj->search_text) ? $conn->real_escape_string($obj->search_text) : '';
 
     if (!empty($search_text)) {
@@ -579,7 +579,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["msg"] = "Login History Not Found";
         $output["body"]["LoginHistory"] = [];
     }
-} else if (isset($obj->action) && $obj->action === 'dashboard' && isset($obj->staff_id)) {
+}else if (isset($obj->action) && $obj->action === 'dashboard' && isset($obj->staff_id)) {
     $current_date = date('Y-m-d');
     $current_month = date('Y-m');
 
@@ -796,8 +796,8 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["code"] = 400;
         $output["head"]["msg"] = "Failed to fetch dashboard data: " . $conn->error;
     }
-} else if (isset($obj->search_text) || isset($obj->area_name) || (isset($obj->staff_id) && isset($obj->action) && $obj->action === 'due_list')) {
-    // Check if action is due_list and staff_id is provided
+}else if (isset($obj->search_text) || isset($obj->area_name) || (isset($obj->staff_id) && isset($obj->action) && $obj->action === 'due_list')) {
+   // Check if action is due_list and staff_id is provided
     if (isset($obj->action) && $obj->action === 'due_list' && isset($obj->staff_id)) {
         // Build SQL query to fetch customer data filtered by staff_id
         $sql = "SELECT * FROM `customer` WHERE `deleted_at` = 0 AND `staff_id` = ?";
@@ -851,116 +851,27 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
         $output["head"]["msg"] = $result->num_rows > 0 ? "Success" : "No customers found for this staff";
         $stmt->close();
     }
-} else if (isset($obj->action) && $obj->action === 'monthly_report' && isset($obj->year)) {
-    $year = (int)$obj->year;
-    $month = isset($obj->month) ? (int)$obj->month : null;
+}else if (isset($obj->action) && $obj->action === 'monthly_report') {
+    // Query all records from monthly_box_history
+    $sql = "SELECT `year`, `month`, `total_boxes`, `active_boxes`, `disconnect_boxes` AS disconnected_boxes, `total_collection`
+            FROM `monthly_box_history`
+            ORDER BY `year` DESC, `month` DESC";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-    if ($month !== null && ($month < 1 || $month > 12)) {
-        $output["head"]["code"] = 400;
-        $output["head"]["msg"] = "Invalid month (must be 1-12)";
-        echo json_encode($output, JSON_NUMERIC_CHECK);
-        exit();
-    }
-
-    // Get current date for restricting future months
-    $current_date = date('Y-m-d'); // e.g., 2025-09-29
-    $current_year = (int)date('Y'); // 2025
-    $current_month = (int)date('m'); // 9
-
-    // Initialize report array
     $report = [];
-
-    $months_to_process = $month !== null ? [$month] : range(1, 12);
-
-    foreach ($months_to_process as $m) {
-        $month_str = sprintf("%02d", $m);
-        $month_start = $year . '-' . $month_str . '-01';
-        $month_end = date('Y-m-t', strtotime($month_start)); // Last day of month
-
-        // Restrict future months
-        if ($year > $current_year || ($year == $current_year && $m > $current_month)) {
-            $report[] = [
-                'year' => $year,
-                'month' => $m,
-                'total_boxes' => 0,
-                'active_boxes' => 0,
-                'disconnected_boxes' => 0,
-                'total_collection' => 0
-            ];
-            continue; // Skip calculations for future months
-        }
-
-        // Total boxes: Customers created before or on month end, not deleted
-        $sql_total_boxes = "
-            SELECT COUNT(DISTINCT customer_id) AS total_boxes
-            FROM `customer`
-            WHERE deleted_at = 0 AND create_at <= ?
-        ";
-        $stmt_total = $conn->prepare($sql_total_boxes);
-        $stmt_total->bind_param("s", $month_end);
-        $stmt_total->execute();
-        $result_total = $stmt_total->get_result();
-        $total_boxes = (int)$result_total->fetch_assoc()['total_boxes'];
-        $stmt_total->close();
-
-        // Active boxes: Customers with plan_name != 'disconnect' during the month
-        $sql_active = "
-            SELECT COUNT(DISTINCT ph.customer_id) AS active_boxes
-            FROM `plan_history` ph
-            LEFT JOIN `customer` c ON ph.customer_id = c.customer_id
-            WHERE c.deleted_at = 0
-            AND ph.plan_name != 'disconnect'
-            AND ph.start_date <= ?
-            AND (ph.end_date IS NULL OR ph.end_date >= ?)
-        ";
-        $stmt_active = $conn->prepare($sql_active);
-        $stmt_active->bind_param("ss", $month_end, $month_start);
-        $stmt_active->execute();
-        $result_active = $stmt_active->get_result();
-        $active_boxes = (int)$result_active->fetch_assoc()['active_boxes'];
-        $stmt_active->close();
-
-        // Disconnected boxes: Customers with plan_name = 'disconnect' during the month
-        $sql_disconnect = "
-            SELECT COUNT(DISTINCT ph.customer_id) AS disconnected_boxes
-            FROM `plan_history` ph
-            LEFT JOIN `customer` c ON ph.customer_id = c.customer_id
-            WHERE c.deleted_at = 0
-            AND ph.plan_name = 'disconnect'
-            AND ph.start_date <= ?
-            AND (ph.end_date IS NULL OR ph.end_date >= ?)
-        ";
-        $stmt_disconnect = $conn->prepare($sql_disconnect);
-        $stmt_disconnect->bind_param("ss", $month_end, $month_start);
-        $stmt_disconnect->execute();
-        $result_disconnect = $stmt_disconnect->get_result();
-        $disconnected_boxes = (int)$result_disconnect->fetch_assoc()['disconnected_boxes'];
-        $stmt_disconnect->close();
-
-        // Total collection for the month
-        $sql_collection = "
-            SELECT COALESCE(SUM(entry_amount), 0) AS total_collection
-            FROM `collection`
-            WHERE deleted_at = 0
-            AND collection_paid_date >= ?
-            AND collection_paid_date <= ?
-        ";
-        $stmt_collection = $conn->prepare($sql_collection);
-        $stmt_collection->bind_param("ss", $month_start, $month_end);
-        $stmt_collection->execute();
-        $result_collection = $stmt_collection->get_result();
-        $total_collection = (float)$result_collection->fetch_assoc()['total_collection'];
-        $stmt_collection->close();
-
+    while ($row = $result->fetch_assoc()) {
         $report[] = [
-            'year' => $year,
-            'month' => $m,
-            'total_boxes' => $total_boxes,
-            'active_boxes' => $active_boxes,
-            'disconnected_boxes' => $disconnected_boxes,
-            'total_collection' => $total_collection
+            'year' => (int)$row['year'],
+            'month' => (int)$row['month'],
+            'total_boxes' => (int)$row['total_boxes'],
+            'active_boxes' => (int)$row['active_boxes'],
+            'disconnected_boxes' => (int)$row['disconnected_boxes'],
+            'total_collection' => (float)$row['total_collection']
         ];
     }
+    $stmt->close();
 
     $output["head"]["code"] = 200;
     $output["head"]["msg"] = "Success";
@@ -968,7 +879,7 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
 
     echo json_encode($output, JSON_NUMERIC_CHECK);
     exit();
-} else {
+}else {
     $output["head"]["code"] = 400;
     $output["head"]["msg"] = "Parameter Mismatch";
     $output["head"]["inputs"] = $obj;
@@ -976,3 +887,4 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
 
 echo json_encode($output, JSON_NUMERIC_CHECK);
 $conn->close();
+?>
