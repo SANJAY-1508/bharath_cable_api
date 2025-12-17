@@ -866,7 +866,8 @@ else if (isset($obj->get_staff_grouped_data)) {
         $output["head"]["msg"] = $result->num_rows > 0 ? "Success" : "No customers found for this staff";
         $stmt->close();
     }
-}else if (isset($obj->action) && $obj->action === 'monthly_report') {
+}
+else if (isset($obj->action) && $obj->action === 'monthly_report') {
     // Query all records from monthly_box_history
     $sql = "SELECT `year`, `month`, `total_boxes`, `active_boxes`, `disconnect_boxes` AS disconnected_boxes, `total_collection`
             FROM `monthly_box_history`
@@ -894,7 +895,54 @@ else if (isset($obj->get_staff_grouped_data)) {
 
     echo json_encode($output, JSON_NUMERIC_CHECK);
     exit();
-}else {
+}
+
+else if (isset($obj->action) && $obj->action === 'monthly_report') {
+    
+    // Get plan_id from payload if it exists
+    $plan_filter = isset($obj->plan_id) ? (int)$obj->plan_id : 0;
+
+    // Start building the SQL
+    // We join 'plan' table to show the name even if we filter by ID
+    $sql = "SELECT h.*, p.plan_name 
+            FROM `monthly_box_history` h
+            LEFT JOIN `plan` p ON h.plan_id = p.plan_id
+            WHERE 1=1";
+
+    // If plan_id is provided in Postman, add it to the WHERE clause
+    if ($plan_filter > 0) {
+        $sql .= " AND h.plan_id = $plan_filter";
+    }
+
+    $sql .= " ORDER BY h.`year` DESC, h.`month` DESC";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $report = [];
+    while ($row = $result->fetch_assoc()) {
+        $report[] = [
+            'year' => (int)$row['year'],
+            'month' => (int)$row['month'],
+            'plan_name' => $row['plan_name'] ?? 'General',
+            'total_boxes' => (int)$row['total_boxes'],
+            'active_boxes' => (int)$row['active_boxes'],
+            'disconnected_boxes' => (int)$row['disconnect_boxes'],
+            'total_collection' => (float)$row['total_collection']
+        ];
+    }
+    
+    $stmt->close();
+
+    $output["head"]["code"] = 200;
+    $output["head"]["msg"] = "Success";
+    $output["body"]["report"] = $report;
+
+    echo json_encode($output, JSON_NUMERIC_CHECK);
+    exit();
+}
+else {
     $output["head"]["code"] = 400;
     $output["head"]["msg"] = "Parameter Mismatch";
     $output["head"]["inputs"] = $obj;
