@@ -947,6 +947,241 @@ if (isset($obj->action) && $obj->action === 'collection_api' && isset($obj->staf
 
     echo json_encode($output, JSON_NUMERIC_CHECK);
     exit();
+} elseif (isset($obj->unpaid_reports_data)) {
+
+    $current_month = date('Y-m');
+
+    /* =========================
+       1️⃣ FILTERED UNPAID COUNT
+       ========================= */
+    $sql_unpaid_count = "
+        SELECT COUNT(*) AS total_unpaid
+        FROM customer c
+        LEFT JOIN collection col 
+            ON c.customer_id = col.customer_id
+            AND col.deleted_at = 0
+            AND DATE_FORMAT(col.collection_paid_date, '%Y-%m') = ?
+        WHERE 
+            c.plan_name != 'disconnect'
+            AND c.deleted_at = 0
+            AND col.customer_id IS NULL
+    ";
+
+    $params_count = [$current_month];
+    $types_count = "s";
+
+    // Add plan_id filter if set
+    if (isset($obj->plan_id) && !empty($obj->plan_id)) {
+        $sql_unpaid_count .= " AND c.plan_id = ?";
+        $params_count[] = $obj->plan_id;
+        $types_count .= "i";
+    }
+
+    // Add area_id filter if set
+    if (isset($obj->area_id) && !empty($obj->area_id)) {
+        $sql_unpaid_count .= " AND c.area_id = ?";
+        $params_count[] = $obj->area_id;
+        $types_count .= "i";
+    }
+
+    // Add staff_id filter if set
+    if (isset($obj->staff_id) && !empty($obj->staff_id)) {
+        $sql_unpaid_count .= " AND c.staff_id = ?";
+        $params_count[] = $obj->staff_id;
+        $types_count .= "i";
+    }
+
+    $stmt_unpaid_count = $conn->prepare($sql_unpaid_count);
+    $stmt_unpaid_count->bind_param($types_count, ...$params_count);
+    $stmt_unpaid_count->execute();
+    $result_unpaid_count = $stmt_unpaid_count->get_result();
+    $unpaid_count_result = $result_unpaid_count->fetch_assoc();
+    $total_unpaid = (int)$unpaid_count_result['total_unpaid'];
+    $stmt_unpaid_count->close();
+
+    /* =========================
+       2️⃣ FILTERED UNPAID REPORTS DATA
+       ========================= */
+    $sql_unpaid_reports = "
+        SELECT c.*
+        FROM customer c
+        LEFT JOIN collection col 
+            ON c.customer_id = col.customer_id
+            AND col.deleted_at = 0
+            AND DATE_FORMAT(col.collection_paid_date, '%Y-%m') = ?
+        WHERE 
+            c.plan_name != 'disconnect'
+            AND c.deleted_at = 0
+            AND col.customer_id IS NULL
+    ";
+
+    $params_data = [$current_month];
+    $types_data = "s";
+
+    // Add plan_id filter if set
+    if (isset($obj->plan_id) && !empty($obj->plan_id)) {
+        $sql_unpaid_reports .= " AND c.plan_id = ?";
+        $params_data[] = $obj->plan_id;
+        $types_data .= "i";
+    }
+
+    // Add area_id filter if set
+    if (isset($obj->area_id) && !empty($obj->area_id)) {
+        $sql_unpaid_reports .= " AND c.area_id = ?";
+        $params_data[] = $obj->area_id;
+        $types_data .= "i";
+    }
+
+    // Add staff_id filter if set
+    if (isset($obj->staff_id) && !empty($obj->staff_id)) {
+        $sql_unpaid_reports .= " AND c.staff_id = ?";
+        $params_data[] = $obj->staff_id;
+        $types_data .= "i";
+    }
+
+    $stmt_unpaid_reports = $conn->prepare($sql_unpaid_reports);
+    $stmt_unpaid_reports->bind_param($types_data, ...$params_data);
+    $stmt_unpaid_reports->execute();
+    $result_unpaid_reports = $stmt_unpaid_reports->get_result();
+    $unpaid_reports_data = $result_unpaid_reports->fetch_all(MYSQLI_ASSOC);
+    $stmt_unpaid_reports->close();
+
+    /* =========================
+       3️⃣ FINAL RESPONSE FOR UNPAID REPORTS
+       ========================= */
+    $output["head"]["code"] = 200;
+    $output["head"]["msg"] = "Success";
+    $output["body"]["unpaid_reports_data"] = [
+        "total_unpaid" => $total_unpaid,
+        "data" => $unpaid_reports_data
+    ];
+} elseif (isset($obj->plan_wise_report)) {
+
+    /* =========================
+       PLAN-WISE COUNTS (TOTAL, ACTIVE, DISCONNECTED)
+       ========================= */
+    $sql_counts = "
+        SELECT 
+            COUNT(*) AS total_boxes,
+            SUM(CASE WHEN plan_name != 'disconnect' THEN 1 ELSE 0 END) AS active_boxes,
+            SUM(CASE WHEN plan_name = 'disconnect' THEN 1 ELSE 0 END) AS disconnected_boxes
+        FROM customer
+        WHERE deleted_at = 0
+    ";
+
+    $params_count = [];
+    $types_count = "";
+
+    // Add plan_id filter if set
+    if (isset($obj->plan_id) && !empty($obj->plan_id)) {
+        $sql_counts .= " AND plan_id = ?";
+        $params_count[] = $obj->plan_id;
+        $types_count .= "i";
+    }
+
+    $stmt_counts = $conn->prepare($sql_counts);
+    if (!empty($types_count)) {
+        $stmt_counts->bind_param($types_count, ...$params_count);
+    }
+    $stmt_counts->execute();
+    $result_counts = $stmt_counts->get_result();
+    $counts = $result_counts->fetch_assoc();
+    $stmt_counts->close();
+
+    /* =========================
+       PLAN-WISE ACTIVE BOXES DATA
+       ========================= */
+    $sql_active = "
+        SELECT *
+        FROM customer
+        WHERE plan_name != 'disconnect' AND deleted_at = 0
+    ";
+
+    $params_active = [];
+    $types_active = "";
+
+    if (isset($obj->plan_id) && !empty($obj->plan_id)) {
+        $sql_active .= " AND plan_id = ?";
+        $params_active[] = $obj->plan_id;
+        $types_active .= "i";
+    }
+
+    $stmt_active = $conn->prepare($sql_active);
+    if (!empty($types_active)) {
+        $stmt_active->bind_param($types_active, ...$params_active);
+    }
+    $stmt_active->execute();
+    $result_active = $stmt_active->get_result();
+    $active_boxes_data = $result_active->fetch_all(MYSQLI_ASSOC);
+    $stmt_active->close();
+
+    /* =========================
+       PLAN-WISE DISCONNECTED BOXES DATA
+       ========================= */
+    $sql_disconnected = "
+        SELECT *
+        FROM customer
+        WHERE plan_name = 'disconnect' AND deleted_at = 0
+    ";
+
+    $params_disconnected = [];
+    $types_disconnected = "";
+
+    if (isset($obj->plan_id) && !empty($obj->plan_id)) {
+        $sql_disconnected .= " AND plan_id = ?";
+        $params_disconnected[] = $obj->plan_id;
+        $types_disconnected .= "i";
+    }
+
+    $stmt_disconnected = $conn->prepare($sql_disconnected);
+    if (!empty($types_disconnected)) {
+        $stmt_disconnected->bind_param($types_disconnected, ...$params_disconnected);
+    }
+    $stmt_disconnected->execute();
+    $result_disconnected = $stmt_disconnected->get_result();
+    $disconnected_boxes_data = $result_disconnected->fetch_all(MYSQLI_ASSOC);
+    $stmt_disconnected->close();
+
+    /* =========================
+       PLAN-WISE TOTAL BOXES DATA
+       ========================= */
+    $sql_total = "
+        SELECT *
+        FROM customer
+        WHERE deleted_at = 0
+    ";
+
+    $params_total = [];
+    $types_total = "";
+
+    if (isset($obj->plan_id) && !empty($obj->plan_id)) {
+        $sql_total .= " AND plan_id = ?";
+        $params_total[] = $obj->plan_id;
+        $types_total .= "i";
+    }
+
+    $stmt_total = $conn->prepare($sql_total);
+    if (!empty($types_total)) {
+        $stmt_total->bind_param($types_total, ...$params_total);
+    }
+    $stmt_total->execute();
+    $result_total = $stmt_total->get_result();
+    $total_boxes_data = $result_total->fetch_all(MYSQLI_ASSOC);
+    $stmt_total->close();
+
+    /* =========================
+       FINAL RESPONSE FOR PLAN-WISE REPORT
+       ========================= */
+    $output["head"]["code"] = 200;
+    $output["head"]["msg"] = "Success";
+    $output["body"]["plan_wise_data"] = [
+        "total_boxes"            => (int)$counts['total_boxes'],
+        "active_boxes"           => (int)$counts['active_boxes'],
+        "disconnected_boxes"     => (int)$counts['disconnected_boxes'],
+        "active_boxes_data"      => $active_boxes_data,
+        "disconnected_boxes_data" => $disconnected_boxes_data,
+        "total_boxes_data"       => $total_boxes_data
+    ];
 } else {
     $output["head"]["code"] = 400;
     $output["head"]["msg"] = "Parameter Mismatch";
