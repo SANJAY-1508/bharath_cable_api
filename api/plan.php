@@ -1,7 +1,6 @@
 <?php
 include 'config/config.php';
-// At the top of login.php (before any output)
-header("Access-Control-Allow-Origin: *"); // Or restrict to http://localhost:53075
+header("Access-Control-Allow-Origin: *"); 
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
@@ -21,9 +20,6 @@ $timestamp = date('Y-m-d H:i:s');
 
 if (isset($obj->search_text)) {
     $search_text = $obj->search_text;
-    
-    // We join the customer table to count how many customers are linked to each plan_id
-    // Using LEFT JOIN ensures plans with 0 customers still show up
     $sql = "SELECT p.*, COUNT(c.customer_id) as customer_count 
             FROM `plan` p 
             LEFT JOIN `customer` c ON p.plan_id = c.plan_id AND c.deleted_at = 0
@@ -39,14 +35,13 @@ if (isset($obj->search_text)) {
         $output["head"]["msg"] = "Success";
         
         while ($row = $result->fetch_assoc()) {
-            // customer_count will now be part of each plan object
             $output["body"]["plan"][$count] = $row;
             $count++;
         }
     } else {
         $output["head"]["code"] = 200;
         $output["head"]["msg"] = "Plan Details Not Found";
-        $output["body"]["plan"] = []; // Changed "user" to "plan" for consistency
+        $output["body"]["plan"] = []; 
     }
 }
 else if (isset($obj->plan_name) && isset($obj->current_user_id)) {
