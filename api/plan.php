@@ -21,20 +21,32 @@ $timestamp = date('Y-m-d H:i:s');
 
 if (isset($obj->search_text)) {
     $search_text = $obj->search_text;
-    $sql = "SELECT * FROM `plan` WHERE `deleted_at`=0 AND `plan_name` LIKE '%$search_text%'";
+    
+    // We join the customer table to count how many customers are linked to each plan_id
+    // Using LEFT JOIN ensures plans with 0 customers still show up
+    $sql = "SELECT p.*, COUNT(c.customer_id) as customer_count 
+            FROM `plan` p 
+            LEFT JOIN `customer` c ON p.plan_id = c.plan_id AND c.deleted_at = 0
+            WHERE p.deleted_at = 0 
+            AND p.plan_name LIKE '%$search_text%'
+            GROUP BY p.plan_id";
+
     $result = $conn->query($sql);
+    
     if ($result->num_rows > 0) {
         $count = 0;
+        $output["head"]["code"] = 200;
+        $output["head"]["msg"] = "Success";
+        
         while ($row = $result->fetch_assoc()) {
-            $output["head"]["code"] = 200;
-            $output["head"]["msg"] = "Success";
+            // customer_count will now be part of each plan object
             $output["body"]["plan"][$count] = $row;
             $count++;
         }
     } else {
         $output["head"]["code"] = 200;
-        $output["head"]["msg"] = "plan Details Not Found";
-        $output["body"]["user"] = [];
+        $output["head"]["msg"] = "Plan Details Not Found";
+        $output["body"]["plan"] = []; // Changed "user" to "plan" for consistency
     }
 }
 else if (isset($obj->plan_name) && isset($obj->current_user_id)) {
