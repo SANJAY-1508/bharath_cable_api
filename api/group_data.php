@@ -1032,6 +1032,11 @@ elseif (isset($obj->unpaid_reports_data)) {
 }
 elseif (isset($obj->plan_wise_report)) {
 
+    // 1. Determine if we are filtering by a specific Plan ID
+    // This matches the 'plan_id' sent in your frontend payload
+    $plan_id = isset($obj->plan_id) && !empty($obj->plan_id) ? $obj->plan_id : null;
+    $plan_filter = $plan_id ? " AND plan_id = ?" : "";
+
     /* =========================
        PLAN-WISE COUNTS (ACTIVE, DISCONNECT, TOTAL PER PLAN)
        ========================= */
@@ -1042,11 +1047,14 @@ elseif (isset($obj->plan_wise_report)) {
             SUM(CASE WHEN plan_name != 'disconnect' THEN 1 ELSE 0 END) AS active_count,
             SUM(CASE WHEN plan_name = 'disconnect' THEN 1 ELSE 0 END) AS disconnect_count
         FROM customer
-        WHERE deleted_at = 0
+        WHERE deleted_at = 0 $plan_filter
         GROUP BY plan_name
     ";
 
     $stmt_plan_counts = $conn->prepare($sql_plan_counts);
+    if ($plan_id) {
+        $stmt_plan_counts->bind_param("s", $plan_id);
+    }
     $stmt_plan_counts->execute();
     $result_plan_counts = $stmt_plan_counts->get_result();
     $plan_counts = $result_plan_counts->fetch_all(MYSQLI_ASSOC);
@@ -1058,11 +1066,14 @@ elseif (isset($obj->plan_wise_report)) {
     $sql_all_customers = "
         SELECT *
         FROM customer
-        WHERE deleted_at = 0
+        WHERE deleted_at = 0 $plan_filter
         ORDER BY plan_name
     ";
 
     $stmt_all = $conn->prepare($sql_all_customers);
+    if ($plan_id) {
+        $stmt_all->bind_param("s", $plan_id);
+    }
     $stmt_all->execute();
     $result_all = $stmt_all->get_result();
     $all_customer_data = $result_all->fetch_all(MYSQLI_ASSOC);
@@ -1082,13 +1093,13 @@ elseif (isset($obj->plan_wise_report)) {
        ========================= */
     $plan_wise_report = [];
     foreach ($plan_counts as $pc) {
-        $plan_name = $pc['plan_name'];
+        $p_name = $pc['plan_name'];
         $plan_wise_report[] = [
-            'plan_name' => $plan_name,
+            'plan_name' => $p_name,
             'total_boxes' => (int)$pc['total_count'],
             'active_count' => (int)$pc['active_count'],
             'disconnect_count' => (int)$pc['disconnect_count'],
-            'data' => $plan_data[$plan_name] ?? []
+            'data' => $plan_data[$p_name] ?? []
         ];
     }
 
@@ -1097,8 +1108,7 @@ elseif (isset($obj->plan_wise_report)) {
        ========================= */
     $output["head"]["code"] = 200;
     $output["head"]["msg"] = "Success";
-    $output["body"]["plan_wise_report"] = $plan_wise_report;
-
+    $output["body"]["plan_wise_report"] = $plan_wise_report; 
 }
 else if (isset($obj->action) && $obj->action === 'monthly_report') {
     // Query all records from monthly_box_history
